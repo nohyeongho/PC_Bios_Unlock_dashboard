@@ -475,12 +475,17 @@
                     <p>시스템에 저장된 모든 기록을 조회합니다.</p>
                 </div>
                 <div style="display:flex; align-items:center; gap:1rem;">
-                    <div style="display:flex; background:#f5f5f5; padding:6px; border-radius:8px; gap:6px; align-items:center; border:1px solid var(--lg-border);">
-                        <span style="font-size:0.8rem; font-weight:700; color:var(--lg-grey-mid); margin-left:5px;">📅 기간 설정:</span>
-                        <input type="date" id="start-date" style="border:none; padding:4px 8px; border-radius:6px; font-size:0.85rem; background:white;">
+                    <div
+                        style="display:flex; background:#f5f5f5; padding:6px; border-radius:8px; gap:6px; align-items:center; border:1px solid var(--lg-border);">
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--lg-grey-mid); margin-left:5px;">📅
+                            기간 설정:</span>
+                        <input type="date" id="start-date"
+                            style="border:none; padding:4px 8px; border-radius:6px; font-size:0.85rem; background:white;">
                         <span style="font-size:0.8rem; font-weight:700; color:var(--lg-grey-mid);">~</span>
-                        <input type="date" id="end-date" style="border:none; padding:4px 8px; border-radius:6px; font-size:0.85rem; background:white;">
-                        <button onclick="downloadExcel()" class="btn-primary" style="padding:0.5rem 1rem; font-size:0.8rem; height:32px;">
+                        <input type="date" id="end-date"
+                            style="border:none; padding:4px 8px; border-radius:6px; font-size:0.85rem; background:white;">
+                        <button onclick="downloadExcel()" class="btn-primary"
+                            style="padding:0.5rem 1rem; font-size:0.8rem; height:32px;">
                             <i data-lucide="download" style="width:14px;"></i> 엑셀 다운로드
                         </button>
                     </div>
@@ -546,7 +551,7 @@
 
         class SmartDash {
             constructor() {
-                // [변경 사유] 사용자가 제공한 URL을 기본값으로 설정하여 즉시 연동되도록 합니다.
+                // [변경 사유] 사용자가 제공한 URL을 기본값으로 설정하여 즉시 연동.
                 const defaultUrl = 'https://script.google.com/macros/s/AKfycbzIXfN5U1WSqQPExuqtrDBp9QRCFyzbzBsTgxtz_iS7AozD5HsxK5LaDh6Nxb6t31QOBg/exec';
                 this.history = JSON.parse(localStorage.getItem('dash_history')) || [];
                 let savedConfig = JSON.parse(localStorage.getItem('dash_config'));
@@ -621,7 +626,7 @@
                     this.updateStatus("연결 상태: 설정에서 API URL을 입력해주세요.");
                 }
 
-                // [변경 사유] 다운로드 기간의 초기값을 오늘로 설정합니다.
+                // [변경 사유] 다운로드 기간의 초기값을 오늘로 설정
                 const now = new Date();
                 const today = now.toISOString().split('T')[0];
                 if (document.getElementById('start-date')) document.getElementById('start-date').value = today;
@@ -636,7 +641,7 @@
                 const loader = document.getElementById('sync-loader');
                 loader.style.display = 'block';
                 try {
-                    // 구글 앱스 스크립트는 리다이렉트가 빈번하므로 URL 구성을 명확히 합니다.
+                    // 구글 앱스 스크립트는 리다이렉트가 빈번하므로 URL 구성을 명확
                     let targetUrl = this.config.url;
                     if (!targetUrl.includes('?')) {
                         targetUrl += `?action=read&token=${this.config.token}`;
@@ -705,8 +710,8 @@
                 const todayStr = now.toLocaleDateString('ko-KR');
                 const todayCount = this.history.filter(r => {
                     if (!r.time) return false;
-                    // [변경 사유] '오전/오후'가 포함된 한글 날짜 문자열은 브라우저에 따라 Date 객체 변환에 실패할 수 있습니다.
-                    // 따라서 Date 객체 비교와 문자열 포함 여부 확인을 병행하여 정확도를 높입니다.
+                    // [변경 사유] '오전/오후'가 포함된 한글 날짜 문자열은 브라우저에 따라 Date 객체 변환에 실패할 수 있음
+                    // 따라서 Date 객체 비교와 문자열 포함 여부 확인을 병행하여 정확도를 높임
                     const d = new Date(r.time);
                     if (!isNaN(d.getTime())) {
                         return d.toLocaleDateString('ko-KR') === todayStr;
@@ -721,7 +726,7 @@
 
                 const renderRows = (data) => data.map(r => {
                     const timeStr = r.time || "N/A";
-                    // [변경 의도] receipt, serial, extra 정보를 조합하여 설명을 생성합니다.
+                    // [변경 의도] receipt, serial, extra 정보를 조합하여 설명을 생성
                     const detailStr = `${r.receipt || ''} / ${r.serial || ''} ${r.extra ? '(' + r.extra + ')' : ''}`;
 
                     return `
@@ -802,7 +807,7 @@
 
         function clearHistory() { if (confirm("시스템 내의 모든 로컬 이력을 삭제하시겠습니까? 구글 시트 원본은 보존됩니다.")) { dash.history = []; dash.save(); dash.updateUI(); } }
 
-        // [변경 사유] 시작일~종료일 기간을 기반으로 엑셀 데이터를 필터링하고 다운로드합니다.
+        // [변경 사유] 시작일~종료일 기간을 기반으로 엑셀 데이터를 필터링하고 다운로드
         function downloadExcel() {
             const startDateVal = document.getElementById('start-date').value;
             const endDateVal = document.getElementById('end-date').value;
@@ -862,13 +867,13 @@
             XLSX.writeFile(workbook, fileName);
         }
 
-        // [변경 사유] 피드백을 남기는 기능을 추가합니다. (현재는 로컬 알림 및 UI 업데이트 위주)
+        // [변경 사유] 피드백을 남기는 기능을 추가 (현재는 로컬 알림 및 UI 업데이트 위주)
         function leaveFeedback(time, model) {
             const feedback = prompt(`[${model}] 활동에 대한 피드백을 입력해주세요:`);
             if (feedback !== null && feedback.trim() !== "") {
-                // 실제 환경에서는 여기서 API를 호출하여 구글 시트에 저장하는 로직이 필요합니다.
+                // 실제 환경에서는 여기서 API를 호출하여 구글 시트에 저장하는 로직이 필요
                 alert(`피드백이 입력되었습니다: "${feedback}"\n\n※ 실제 구글 시트 저장 기능을 구현하려면 API(Apps Script)에 'write' 액션 추가가 필요합니다.`);
-                
+
                 // UI 상에서 즉시 확인 가능하도록 로컬 데이터 업데이트 (임시)
                 const target = dash.history.find(r => r.time === time && r.model === model);
                 if (target) {
