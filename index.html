@@ -175,7 +175,8 @@
             background: #F9FAFB;
             font-weight: 700;
             border-bottom: 2px solid var(--lg-border);
-            cursor: pointer; /* 클릭 가능함을 표시 */
+            cursor: pointer;
+            /* 클릭 가능함을 표시 */
             user-select: none;
             position: relative;
             transition: var(--transition);
@@ -400,13 +401,14 @@
                     <p id="sync-status">시스템이 정상적으로 작동 중입니다.</p>
                 </div>
                 <div style="display:flex; flex-direction:column; align-items:flex-end; gap:0.5rem;">
-                    <div id="last-sync-time" style="font-size: 0.85rem; color: var(--lg-grey-mid); font-weight: 600;"></div>
+                    <div id="last-sync-time" style="font-size: 0.85rem; color: var(--lg-grey-mid); font-weight: 600;">
+                    </div>
                     <div style="display:flex; align-items:center; gap:0.5rem;">
                         <span class="auto-sync-tag">
                             <i data-lucide="refresh-cw" style="width:10px;"></i>
                             자동 동기화
                         </span>
-                        <select id="auto-sync-select" onchange="dash.setAutoSync(this.value)" 
+                        <select id="auto-sync-select" onchange="dash.setAutoSync(this.value)"
                             style="padding:0.3rem 0.5rem; font-size:0.75rem; border-color:var(--lg-border); height:28px;">
                             <option value="0">꺼짐</option>
                             <option value="1">1분</option>
@@ -452,6 +454,8 @@
                             <th onclick="dash.sort('time')">DATE & TIME</th>
                             <th onclick="dash.sort('type')">CATEGORY</th>
                             <th onclick="dash.sort('model')">NAME / MODEL</th>
+                            <th onclick="dash.sort('user_id')">USER ID</th>
+                            <th onclick="dash.sort('user_name')">USER NAME</th>
                             <th onclick="dash.sort('receipt')">DESCRIPTION</th>
                             <th onclick="dash.sort('key')">RESULT</th>
                         </tr>
@@ -479,6 +483,8 @@
                             <th onclick="dash.sort('time')">DATE & TIME</th>
                             <th onclick="dash.sort('type')">CATEGORY</th>
                             <th onclick="dash.sort('model')">NAME / MODEL</th>
+                            <th onclick="dash.sort('user_id')">USER ID</th>
+                            <th onclick="dash.sort('user_name')">USER NAME</th>
                             <th onclick="dash.sort('receipt')">DESCRIPTION</th>
                             <th onclick="dash.sort('key')">RESULT</th>
                         </tr>
@@ -502,7 +508,7 @@
                         style="display:block; margin-bottom:0.6rem; font-size:0.85rem; font-weight:700; color:var(--lg-grey-mid);">Apps
                         Script Web App URL</label>
                     <input type="text" id="config-url"
-                        placeholder="https://script.google.com/macros/s/AKfycbxOLEqaDwsuyfaC-_-SIuZ3VzVpLXZGhnsi4vSc5BgAFqcCadqSk6mS9StPbfhJY35HdA/exec"
+                        placeholder="https://script.google.com/macros/s/AKfycbzIXfN5U1WSqQPExuqtrDBp9QRCFyzbzBsTgxtz_iS7AozD5HsxK5LaDh6Nxb6t31QOBg/exec"
                         style="width:100%;">
                 </div>
                 <div style="margin-bottom: 2rem;">
@@ -527,10 +533,10 @@
         class SmartDash {
             constructor() {
                 // [변경 사유] 사용자가 제공한 URL을 기본값으로 설정하여 즉시 연동되도록 합니다.
-                const defaultUrl = 'https://script.google.com/macros/s/AKfycbxOLEqaDwsuyfaC-_-SIuZ3VzVpLXZGhnsi4vSc5BgAFqcCadqSk6mS9StPbfhJY35HdA/exec';
+                const defaultUrl = 'https://script.google.com/macros/s/AKfycbzIXfN5U1WSqQPExuqtrDBp9QRCFyzbzBsTgxtz_iS7AozD5HsxK5LaDh6Nxb6t31QOBg/exec';
                 this.history = JSON.parse(localStorage.getItem('dash_history')) || [];
                 let savedConfig = JSON.parse(localStorage.getItem('dash_config'));
-                
+
                 // 정렬 상태 관리 (기본값: 시간순 내림차순)
                 this.sortColumn = 'time';
                 this.sortOrder = 'desc';
@@ -565,13 +571,13 @@
             setAutoSync(minutes) {
                 this.autoSyncMinutes = parseInt(minutes);
                 localStorage.setItem('dash_auto_sync', this.autoSyncMinutes);
-                
+
                 // 기존 타이머가 있다면 제거
                 if (this.autoSyncTimer) {
                     clearInterval(this.autoSyncTimer);
                     this.autoSyncTimer = null;
                 }
-                
+
                 // 새로운 주기로 타이머 설정 (0분이면 '꺼짐')
                 if (this.autoSyncMinutes > 0) {
                     this.autoSyncTimer = setInterval(() => {
@@ -584,7 +590,7 @@
             async init() {
                 document.getElementById('config-url').value = this.config.url;
                 document.getElementById('config-token').value = this.config.token;
-                
+
                 // 자동 동기화 초기 UI 반영 및 타이머 시작
                 const syncSelect = document.getElementById('auto-sync-select');
                 if (syncSelect) {
@@ -593,7 +599,7 @@
                 }
 
                 this.updateUI();
-                
+
                 if (this.config.url) {
                     this.updateStatus("시스템 연결 중...");
                     await this.fetchFromSheet();
@@ -619,11 +625,11 @@
                     }
 
                     const response = await fetch(targetUrl);
-                    
+
                     if (!response.ok) throw new Error('네트워크 응답 에러');
-                    
+
                     const data = await response.json();
-                    
+
                     if (Array.isArray(data)) {
                         this.history = data.reverse();
                         this.save();
@@ -645,12 +651,12 @@
 
             updateUI() {
                 const count = parseInt(document.getElementById('briefing-count')?.value || 10);
-                
+
                 // 데이터 정렬 처리
                 const sortedData = [...this.history].sort((a, b) => {
                     let valA = a[this.sortColumn] || '';
                     let valB = b[this.sortColumn] || '';
-                    
+
                     // DATE & TIME 컬럼은 날짜 객체로 비교
                     if (this.sortColumn === 'time') {
                         valA = new Date(valA);
@@ -660,7 +666,7 @@
                         valA = valA.toString().toLowerCase();
                         valB = valB.toString().toLowerCase();
                     }
-                    
+
                     if (valA < valB) return this.sortOrder === 'asc' ? -1 : 1;
                     if (valA > valB) return this.sortOrder === 'asc' ? 1 : -1;
                     return 0;
@@ -688,13 +694,16 @@
 
                 const renderRows = (data) => data.map(r => {
                     const timeStr = r.time || "N/A";
-                    const detailStr = `${r.receipt || ''} / ${r.serial || ''} ${r.extra ? '('+r.extra+')' : ''}`;
-                    
+                    // [변경 의도] receipt, serial, extra 정보를 조합하여 설명을 생성합니다.
+                    const detailStr = `${r.receipt || ''} / ${r.serial || ''} ${r.extra ? '(' + r.extra + ')' : ''}`;
+
                     return `
                         <tr>
                             <td style="font-weight:700; color:var(--lg-grey-mid); font-size:0.8rem;">${timeStr}</td>
                             <td><span class="tag ${r.type === 'BIOS' ? 'tag-bios' : 'tag-app'}">${r.type || 'N/A'}</span></td>
                             <td style="font-weight:800; letter-spacing:-0.2px;">${r.model || 'N/A'}</td>
+                            <td style="color:var(--lg-grey-mid); font-size:0.85rem;">${r.user_id || '-'}</td>
+                            <td style="color:var(--lg-grey-mid); font-size:0.85rem;">${r.user_name || '-'}</td>
                             <td style="color:var(--lg-grey-mid); font-size:0.85rem;">${detailStr}</td>
                             <td style="font-family:monospace; color:var(--lg-red); font-weight:800; font-size:0.95rem;">${r.key || '-'}</td>
                         </tr>
