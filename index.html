@@ -175,6 +175,29 @@
             background: #F9FAFB;
             font-weight: 700;
             border-bottom: 2px solid var(--lg-border);
+            cursor: pointer; /* 클릭 가능함을 표시 */
+            user-select: none;
+            position: relative;
+            transition: var(--transition);
+        }
+
+        th:hover {
+            background: #f0f0f0;
+        }
+
+        /* 정렬 상태 표시 아이콘 */
+        th.sort-asc::after {
+            content: ' ↑';
+            position: absolute;
+            right: 10px;
+            color: var(--lg-red);
+        }
+
+        th.sort-desc::after {
+            content: ' ↓';
+            position: absolute;
+            right: 10px;
+            color: var(--lg-red);
         }
 
         td {
@@ -310,6 +333,18 @@
                 transform: rotate(360deg);
             }
         }
+
+        .auto-sync-tag {
+            background: #f0f0f0;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            color: var(--lg-grey-mid);
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
     </style>
 </head>
 
@@ -364,7 +399,24 @@
                     <h1>실시간 활동 요약</h1>
                     <p id="sync-status">시스템이 정상적으로 작동 중입니다.</p>
                 </div>
-                <div id="last-sync-time" style="font-size: 0.85rem; color: var(--lg-grey-mid); font-weight: 600;"></div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:0.5rem;">
+                    <div id="last-sync-time" style="font-size: 0.85rem; color: var(--lg-grey-mid); font-weight: 600;"></div>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <span class="auto-sync-tag">
+                            <i data-lucide="refresh-cw" style="width:10px;"></i>
+                            자동 동기화
+                        </span>
+                        <select id="auto-sync-select" onchange="dash.setAutoSync(this.value)" 
+                            style="padding:0.3rem 0.5rem; font-size:0.75rem; border-color:var(--lg-border); height:28px;">
+                            <option value="0">꺼짐</option>
+                            <option value="1">1분</option>
+                            <option value="3">3분</option>
+                            <option value="5">5분</option>
+                            <option value="10">10분</option>
+                            <option value="30">30분</option>
+                        </select>
+                    </div>
+                </div>
             </header>
             <div class="stats-grid">
                 <div class="stat-card">
@@ -397,11 +449,11 @@
                 <table id="recent-table">
                     <thead>
                         <tr>
-                            <th>DATE & TIME</th>
-                            <th>CATEGORY</th>
-                            <th>NAME / MODEL</th>
-                            <th>DESCRIPTION</th>
-                            <th>RESULT</th>
+                            <th onclick="dash.sort('time')">DATE & TIME</th>
+                            <th onclick="dash.sort('type')">CATEGORY</th>
+                            <th onclick="dash.sort('model')">NAME / MODEL</th>
+                            <th onclick="dash.sort('receipt')">DESCRIPTION</th>
+                            <th onclick="dash.sort('key')">RESULT</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -424,11 +476,11 @@
                 <table id="history-table">
                     <thead>
                         <tr>
-                            <th>DATE & TIME</th>
-                            <th>CATEGORY</th>
-                            <th>NAME / MODEL</th>
-                            <th>DESCRIPTION</th>
-                            <th>RESULT</th>
+                            <th onclick="dash.sort('time')">DATE & TIME</th>
+                            <th onclick="dash.sort('type')">CATEGORY</th>
+                            <th onclick="dash.sort('model')">NAME / MODEL</th>
+                            <th onclick="dash.sort('receipt')">DESCRIPTION</th>
+                            <th onclick="dash.sort('key')">RESULT</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -479,6 +531,14 @@
                 this.history = JSON.parse(localStorage.getItem('dash_history')) || [];
                 let savedConfig = JSON.parse(localStorage.getItem('dash_config'));
                 
+                // 정렬 상태 관리 (기본값: 시간순 내림차순)
+                this.sortColumn = 'time';
+                this.sortOrder = 'desc';
+
+                // 자동 동기화 타이머 및 주기 관리
+                this.autoSyncTimer = null;
+                this.autoSyncMinutes = parseInt(localStorage.getItem('dash_auto_sync')) || 0;
+
                 // 저장된 설정이 없거나 URL이 비어있으면 기본값 사용
                 if (!savedConfig || !savedConfig.url) {
                     this.config = { url: defaultUrl, token: 'bios_secret_2026' };
@@ -488,9 +548,50 @@
                 this.init();
             }
 
+            // 정렬 기능 수행
+            sort(column) {
+                if (this.sortColumn === column) {
+                    // 동일한 컬럼 클릭 시 방향 전환
+                    this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
+                } else {
+                    // 새로운 컬럼 클릭 시 기본 오름차순
+                    this.sortColumn = column;
+                    this.sortOrder = 'asc';
+                }
+                this.updateUI();
+            }
+
+            // 자동 동기화 설정 및 타이머 시작
+            setAutoSync(minutes) {
+                this.autoSyncMinutes = parseInt(minutes);
+                localStorage.setItem('dash_auto_sync', this.autoSyncMinutes);
+                
+                // 기존 타이머가 있다면 제거
+                if (this.autoSyncTimer) {
+                    clearInterval(this.autoSyncTimer);
+                    this.autoSyncTimer = null;
+                }
+                
+                // 새로운 주기로 타이머 설정 (0분이면 '꺼짐')
+                if (this.autoSyncMinutes > 0) {
+                    this.autoSyncTimer = setInterval(() => {
+                        console.log(`[Auto-Sync] ${this.autoSyncMinutes}분 간격 데이터 갱신 중...`);
+                        this.fetchFromSheet();
+                    }, this.autoSyncMinutes * 60 * 1000);
+                }
+            }
+
             async init() {
                 document.getElementById('config-url').value = this.config.url;
                 document.getElementById('config-token').value = this.config.token;
+                
+                // 자동 동기화 초기 UI 반영 및 타이머 시작
+                const syncSelect = document.getElementById('auto-sync-select');
+                if (syncSelect) {
+                    syncSelect.value = this.autoSyncMinutes;
+                    this.setAutoSync(this.autoSyncMinutes);
+                }
+
                 this.updateUI();
                 
                 if (this.config.url) {
@@ -545,7 +646,35 @@
             updateUI() {
                 const count = parseInt(document.getElementById('briefing-count')?.value || 10);
                 
-                // [변경 사유] API에서 내려주는 필드명은 'time'입니다.
+                // 데이터 정렬 처리
+                const sortedData = [...this.history].sort((a, b) => {
+                    let valA = a[this.sortColumn] || '';
+                    let valB = b[this.sortColumn] || '';
+                    
+                    // DATE & TIME 컬럼은 날짜 객체로 비교
+                    if (this.sortColumn === 'time') {
+                        valA = new Date(valA);
+                        valB = new Date(valB);
+                    } else {
+                        // 문자열 비교 (대소문자 무시)
+                        valA = valA.toString().toLowerCase();
+                        valB = valB.toString().toLowerCase();
+                    }
+                    
+                    if (valA < valB) return this.sortOrder === 'asc' ? -1 : 1;
+                    if (valA > valB) return this.sortOrder === 'asc' ? 1 : -1;
+                    return 0;
+                });
+
+                // 테이블 헤더 정렬 아이콘 업데이트
+                document.querySelectorAll('th').forEach(th => {
+                    th.classList.remove('sort-asc', 'sort-desc');
+                    // 현재 정렬된 컬럼의 헤더에 클래스 추가
+                    if (th.getAttribute('onclick')?.includes(`'${this.sortColumn}'`)) {
+                        th.classList.add(this.sortOrder === 'asc' ? 'sort-asc' : 'sort-desc');
+                    }
+                });
+
                 const today = new Date().toLocaleDateString('ko-KR');
                 const todayCount = this.history.filter(r => {
                     if (!r.time) return false;
@@ -555,11 +684,9 @@
 
                 document.getElementById('stat-total').innerText = this.history.length;
                 document.getElementById('stat-today').innerText = todayCount;
-                // [변경 사유] API에서 내려주는 필드명은 'model'입니다.
                 document.getElementById('stat-last').innerText = this.history[0]?.model || '없음';
 
                 const renderRows = (data) => data.map(r => {
-                    // API 필드: time, type, model, receipt, serial, extra, key
                     const timeStr = r.time || "N/A";
                     const detailStr = `${r.receipt || ''} / ${r.serial || ''} ${r.extra ? '('+r.extra+')' : ''}`;
                     
@@ -574,8 +701,8 @@
                     `;
                 }).join('');
 
-                document.querySelector('#recent-table tbody').innerHTML = renderRows(this.history.slice(0, count));
-                document.querySelector('#history-table tbody').innerHTML = renderRows(this.history);
+                document.querySelector('#recent-table tbody').innerHTML = renderRows(sortedData.slice(0, count));
+                document.querySelector('#history-table tbody').innerHTML = renderRows(sortedData);
                 lucide.createIcons();
             }
 
