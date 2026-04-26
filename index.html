@@ -11,6 +11,7 @@
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
         :root {
@@ -458,6 +459,7 @@
                             <th onclick="dash.sort('user_name')">USER NAME</th>
                             <th onclick="dash.sort('receipt')">DESCRIPTION</th>
                             <th onclick="dash.sort('key')">RESULT</th>
+                            <th onclick="dash.sort('feedback')">FEEDBACK</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -472,9 +474,20 @@
                     <h1>전체 활동 데이터</h1>
                     <p>시스템에 저장된 모든 기록을 조회합니다.</p>
                 </div>
-                <button onclick="clearHistory()"
-                    style="color:var(--lg-red); background:none; border:none; cursor:pointer; font-weight:700; font-size:0.9rem;">전체
-                    데이터 초기화</button>
+                <div style="display:flex; align-items:center; gap:1rem;">
+                    <div style="display:flex; background:#f5f5f5; padding:6px; border-radius:8px; gap:6px; align-items:center; border:1px solid var(--lg-border);">
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--lg-grey-mid); margin-left:5px;">📅 기간 설정:</span>
+                        <input type="date" id="start-date" style="border:none; padding:4px 8px; border-radius:6px; font-size:0.85rem; background:white;">
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--lg-grey-mid);">~</span>
+                        <input type="date" id="end-date" style="border:none; padding:4px 8px; border-radius:6px; font-size:0.85rem; background:white;">
+                        <button onclick="downloadExcel()" class="btn-primary" style="padding:0.5rem 1rem; font-size:0.8rem; height:32px;">
+                            <i data-lucide="download" style="width:14px;"></i> 엑셀 다운로드
+                        </button>
+                    </div>
+                    <button onclick="clearHistory()"
+                        style="color:var(--lg-red); background:none; border:none; cursor:pointer; font-weight:700; font-size:0.9rem; margin-left:10px;">전체
+                        데이터 초기화</button>
+                </div>
             </header>
             <div class="data-card">
                 <table id="history-table">
@@ -487,6 +500,7 @@
                             <th onclick="dash.sort('user_name')">USER NAME</th>
                             <th onclick="dash.sort('receipt')">DESCRIPTION</th>
                             <th onclick="dash.sort('key')">RESULT</th>
+                            <th onclick="dash.sort('feedback')">FEEDBACK</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -606,6 +620,12 @@
                 } else {
                     this.updateStatus("연결 상태: 설정에서 API URL을 입력해주세요.");
                 }
+
+                // [변경 사유] 다운로드 기간의 초기값을 오늘로 설정합니다.
+                const now = new Date();
+                const today = now.toISOString().split('T')[0];
+                if (document.getElementById('start-date')) document.getElementById('start-date').value = today;
+                if (document.getElementById('end-date')) document.getElementById('end-date').value = today;
             }
 
             async fetchFromSheet() {
@@ -634,7 +654,7 @@
                         this.history = data.reverse();
                         this.save();
                         this.updateUI();
-                        this.updateStatus("연결 상태: 구글 시트 동기화 완료");
+                        this.updateStatus("연결 상태: 동기화 완료");
                         document.getElementById('last-sync-time').innerText = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
                     } else if (data.error || (typeof data === 'string' && data.startsWith('Error'))) {
                         this.updateStatus("연결 상태: " + (data.error || data));
@@ -681,11 +701,18 @@
                     }
                 });
 
-                const today = new Date().toLocaleDateString('ko-KR');
+                const now = new Date();
+                const todayStr = now.toLocaleDateString('ko-KR');
                 const todayCount = this.history.filter(r => {
                     if (!r.time) return false;
+                    // [변경 사유] '오전/오후'가 포함된 한글 날짜 문자열은 브라우저에 따라 Date 객체 변환에 실패할 수 있습니다.
+                    // 따라서 Date 객체 비교와 문자열 포함 여부 확인을 병행하여 정확도를 높입니다.
                     const d = new Date(r.time);
-                    return d.toLocaleDateString('ko-KR') === today;
+                    if (!isNaN(d.getTime())) {
+                        return d.toLocaleDateString('ko-KR') === todayStr;
+                    }
+                    // Date 객체 변환 실패 시: "2026. 4. 26." 형태의 문자열이 포함되어 있는지 확인
+                    return r.time.includes(todayStr.replace(/\.$/, '').trim());
                 }).length;
 
                 document.getElementById('stat-total').innerText = this.history.length;
@@ -706,6 +733,14 @@
                             <td style="color:var(--lg-grey-mid); font-size:0.85rem;">${r.user_name || '-'}</td>
                             <td style="color:var(--lg-grey-mid); font-size:0.85rem;">${detailStr}</td>
                             <td style="font-family:monospace; color:var(--lg-red); font-weight:800; font-size:0.95rem;">${r.key || '-'}</td>
+                            <td style="color:var(--lg-grey-mid); font-size:0.85rem;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-style:italic;">${r.feedback || '-'}</span>
+                                    <button onclick="leaveFeedback('${r.time}', '${r.model}')" style="background:none; border:none; color:var(--lg-red); cursor:pointer; padding:2px; display:flex; align-items:center;" title="피드백 남기기">
+                                        <i data-lucide="message-square" style="width:14px;"></i>
+                                    </button>
+                                </div>
+                            </td>
                         </tr>
                     `;
                 }).join('');
@@ -766,6 +801,82 @@
         }
 
         function clearHistory() { if (confirm("시스템 내의 모든 로컬 이력을 삭제하시겠습니까? 구글 시트 원본은 보존됩니다.")) { dash.history = []; dash.save(); dash.updateUI(); } }
+
+        // [변경 사유] 시작일~종료일 기간을 기반으로 엑셀 데이터를 필터링하고 다운로드합니다.
+        function downloadExcel() {
+            const startDateVal = document.getElementById('start-date').value;
+            const endDateVal = document.getElementById('end-date').value;
+
+            if (!startDateVal || !endDateVal) {
+                alert("시작일과 종료일을 모두 선택해주세요.");
+                return;
+            }
+
+            // 비교를 위한 숫자형 날짜 생성 (YYYYMMDD)
+            const getNumDate = (str) => parseInt(str.replace(/-/g, ''));
+            const startNum = getNumDate(startDateVal);
+            const endNum = getNumDate(endDateVal);
+
+            if (startNum > endNum) {
+                alert("시작일이 종료일보다 늦을 수 없습니다.");
+                return;
+            }
+
+            const filteredData = dash.history.filter(r => {
+                if (!r.time) return false;
+                // [참고] r.time 형식: "2026. 4. 26. 오전 11:37:16"
+                const match = r.time.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
+                if (match) {
+                    const y = match[1];
+                    const m = match[2].padStart(2, '0');
+                    const d = match[3].padStart(2, '0');
+                    const rNum = parseInt(`${y}${m}${d}`);
+                    return rNum >= startNum && rNum <= endNum;
+                }
+                return false;
+            });
+
+            if (filteredData.length === 0) {
+                alert("선택한 기간에 해당하는 데이터가 없습니다.");
+                return;
+            }
+
+            // 엑셀 데이터 구성
+            const excelRows = filteredData.map(r => ({
+                "DATE & TIME": r.time,
+                "CATEGORY": r.type,
+                "NAME / MODEL": r.model,
+                "USER ID": r.user_id || '',
+                "USER NAME": r.user_name || '',
+                "DESCRIPTION": `${r.receipt || ''} / ${r.serial || ''} ${r.extra ? '(' + r.extra + ')' : ''}`,
+                "RESULT": r.key || '',
+                "FEEDBACK": r.feedback || ''
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(excelRows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Activities");
+
+            // 파일명 생성
+            const fileName = `Activity_Log_${startDateVal.replace(/-/g, '')}_${endDateVal.replace(/-/g, '')}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
+        }
+
+        // [변경 사유] 피드백을 남기는 기능을 추가합니다. (현재는 로컬 알림 및 UI 업데이트 위주)
+        function leaveFeedback(time, model) {
+            const feedback = prompt(`[${model}] 활동에 대한 피드백을 입력해주세요:`);
+            if (feedback !== null && feedback.trim() !== "") {
+                // 실제 환경에서는 여기서 API를 호출하여 구글 시트에 저장하는 로직이 필요합니다.
+                alert(`피드백이 입력되었습니다: "${feedback}"\n\n※ 실제 구글 시트 저장 기능을 구현하려면 API(Apps Script)에 'write' 액션 추가가 필요합니다.`);
+                
+                // UI 상에서 즉시 확인 가능하도록 로컬 데이터 업데이트 (임시)
+                const target = dash.history.find(r => r.time === time && r.model === model);
+                if (target) {
+                    target.feedback = feedback;
+                    dash.updateUI();
+                }
+            }
+        }
     </script>
 </body>
 
